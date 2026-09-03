@@ -235,8 +235,7 @@ export const TimelineSection: React.FC<TimelineSectionProps> = ({
         {/* Chart Canvas Area */}
         <Box
           sx={{
-            borderRadius: 1.5,
-            border: '1px solid #e2e8f0',
+            width: '100%',
             overflow: 'hidden',
             backgroundColor: '#ffffff',
             mb: 2,
