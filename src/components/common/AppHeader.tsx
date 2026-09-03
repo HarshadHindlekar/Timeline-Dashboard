@@ -42,10 +42,13 @@ export const AppHeader: React.FC = () => {
 
   return (
     <AppBar
-      position="static"
+      position="sticky"
       elevation={0}
       sx={{
-        backgroundColor: '#ffffff',
+        top: 0,
+        zIndex: 1100,
+        backgroundColor: 'rgba(255, 255, 255, 0.98)',
+        backdropFilter: 'blur(8px)',
         borderBottom: '1px solid #e2e8f0',
         color: '#1e293b',
       }}
@@ -134,6 +137,7 @@ export const AppHeader: React.FC = () => {
               anchorEl={anchorEl}
               open={Boolean(anchorEl)}
               onClose={handleMenuClose}
+              disableScrollLock
               transformOrigin={{ horizontal: 'right', vertical: 'top' }}
               anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
               PaperProps={{
