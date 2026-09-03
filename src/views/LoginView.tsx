@@ -26,8 +26,8 @@ export const LoginView: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [username, setUsername] = useState('analytics_user');
-  const [password, setPassword] = useState('dashboard123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -189,21 +189,6 @@ export const LoginView: React.FC = () => {
             >
               {isSubmitting ? <CircularProgress size={24} color="inherit" /> : 'Sign In'}
             </Button>
-
-            <Box
-              sx={{
-                p: 1.5,
-                bgcolor: '#f1f5f9',
-                borderRadius: 1.5,
-                fontSize: '0.75rem',
-                color: '#475569',
-              }}
-            >
-              <Typography variant="caption" sx={{ fontWeight: 600, display: 'block' }}>
-                Test Credentials:
-              </Typography>
-              Username: <code>analytics_user</code> · Password: <code>dashboard123</code>
-            </Box>
           </form>
         </CardContent>
       </Card>
