@@ -42,7 +42,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Canvas dimensions
-  const [dimensions, setDimensions] = useState({ width: 1000, height: 310 });
+  const [dimensions, setDimensions] = useState({ width: 1000, height: 320 });
 
   // Zoom range state [startMs, endMs]
   const defaultRange = useMemo(() => {
@@ -64,8 +64,9 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
   // Tooltip state
   const [tooltipData, setTooltipData] = useState<HoverTooltipData | null>(null);
 
-  // Generous padding so Y-axis labels, X-axis labels, and badges never get clipped
-  const padding = useMemo(() => ({ top: 40, right: 35, bottom: 50, left: 60 }), []);
+  // Padding: generous bottom padding to support the gap between chart and X-axis
+  const padding = useMemo(() => ({ top: 35, right: 35, bottom: 65, left: 55 }), []);
+  const axisGap = 16; // 16px white gap between bottom of chart and the X-axis baseline (matching mockup)
 
   // 1. Preprocess and sort all individual produces once, assigning cumulative index
   const sortedProduces = useMemo<ProcessedProduce[]>(() => {
@@ -219,7 +220,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
     return points;
   }, [intervals?.produce_counts, defaultRange.startMs]);
 
-  // Dynamic Y Scale with 25px top headroom (so line and badges NEVER touch the ceiling)
+  // Y Scale matching mockup: 0, 250, 500
   const yAxisConfig = useMemo(() => {
     let highest = 0;
     if (showIndividualProduces && sortedProduces.length > 0) {
@@ -228,7 +229,6 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
       highest = Math.max(...cumulativePoints.map((p) => p.cumulative));
     }
 
-    // Default to clean enterprise steps (0, 250, 500) matching SS 2
     if (highest <= 470) {
       return { yMax: 500, ticks: [0, 250, 500] };
     } else if (highest <= 700) {
@@ -248,7 +248,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
         const { clientWidth } = containerRef.current;
         setDimensions({
           width: Math.max(clientWidth, 600),
-          height: 310,
+          height: 320,
         });
       }
     };
@@ -275,11 +275,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
     const chartW = width - padding.left - padding.right;
     const chartH = height - padding.top - padding.bottom;
 
-    // Reserve 25px headroom inside the chart area above the top tick (e.g. 500)
-    const topHeadroom = 25;
-    const plotH = chartH - topHeadroom;
-
-    // Clear background to crisp white
+    // Clear whole canvas to crisp white
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, width, height);
 
@@ -292,11 +288,16 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
 
     const countToY = (count: number): number => {
       if (yAxisConfig.yMax <= 0) return padding.top + chartH;
-      // Maps 0 to bottom (padding.top + chartH) and yMax to (padding.top + topHeadroom)
-      return padding.top + chartH - (count / yAxisConfig.yMax) * plotH;
+      // 0 maps to padding.top + chartH (bottom of chart box)
+      // yMax maps to padding.top (top of chart box)
+      return padding.top + chartH - (count / yAxisConfig.yMax) * chartH;
     };
 
-    // 1. Draw segment bands ONLY within the clip box so they stay inside chart bounds
+    // 1. Draw Chart Box Background & Subtle Outline (Matching Mockup)
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(padding.left, padding.top, chartW, chartH);
+
+    // 2. Draw segment bands inside chart area clip
     ctx.save();
     ctx.beginPath();
     ctx.rect(padding.left, padding.top, chartW, chartH);
@@ -331,7 +332,13 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
     }
     ctx.restore(); // END SEGMENT CLIP
 
-    // 2. Draw Y-Axis Grid Lines & Tick Labels
+    // 3. Draw Chart Box Outline & Horizontal Grid Lines
+    // Thin outer border enclosing the chart plotting area
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(padding.left, padding.top, chartW, chartH);
+
+    // Horizontal grid lines & Y labels
     ctx.font = '500 11px Inter, sans-serif';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
@@ -339,26 +346,28 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
     for (const val of yAxisConfig.ticks) {
       const y = countToY(val);
 
-      // Label on the left
+      // Y-axis value label
       ctx.fillStyle = '#64748b';
       ctx.fillText(String(val), padding.left - 10, y);
 
-      // Light horizontal grid line spanning chart width
-      ctx.strokeStyle = '#e2e8f0';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(padding.left, y);
-      ctx.lineTo(padding.left + chartW, y);
-      ctx.stroke();
+      // Grid line inside chart
+      if (val > 0 && val < yAxisConfig.yMax) {
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(padding.left, y);
+        ctx.lineTo(padding.left + chartW, y);
+        ctx.stroke();
+      }
     }
 
-    // Y Axis Title: Cumulative production (top left)
+    // Y Axis Title: Cumulative production (above top left)
     ctx.fillStyle = '#64748b';
     ctx.font = '500 11px Inter, sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText('Cumulative production', padding.left, padding.top - 14);
 
-    // 3. Draw Cumulative Line or Individual Produces (UNCLIPPED so badges and markers are never cut off)
+    // 4. Draw Cumulative Line or Individual Produces
     if (!showIndividualProduces) {
       // MODE: Cumulative Line (Mockup 3 / SS 2)
       if (cumulativePoints.length > 1) {
@@ -476,7 +485,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
       }
     }
 
-    // 4. Draw "NOW" Indicator Line & Badge
+    // 5. Draw "NOW" Indicator Line & Badge
     if (lastActiveTimestampMs && lastActiveTimestampMs < defaultRange.endMs) {
       if (lastActiveTimestampMs >= zoomRange.startMs && lastActiveTimestampMs <= zoomRange.endMs) {
         const nowX = timeToX(lastActiveTimestampMs);
@@ -503,16 +512,17 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
       }
     }
 
-    // 5. Draw X-Axis Baseline & Ticks
-    // Crisp bottom axis baseline
-    ctx.strokeStyle = '#94a3b8';
-    ctx.lineWidth = 1.5;
+    // 6. Draw X-Axis Baseline & Ticks (WITH THE 16px GAP MATCHING MOCKUP!)
+    const axisY = padding.top + chartH + axisGap;
+
+    ctx.strokeStyle = '#64748b';
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.moveTo(padding.left, padding.top + chartH);
-    ctx.lineTo(padding.left + chartW, padding.top + chartH);
+    ctx.moveTo(padding.left, axisY);
+    ctx.lineTo(padding.left + chartW, axisY);
     ctx.stroke();
 
-    // Shift-Aligned Ticks (Matching SS 2: 08:30, 09:30, 11:30, 13:30, 15:30, 17:30, 19:00)
+    // Shift-Aligned Ticks: 08:30, 09:30, 11:30, 13:30, 15:30, 17:30, 19:00
     ctx.fillStyle = '#334155';
     ctx.font = '600 11px Inter, sans-serif';
     ctx.textAlign = 'center';
@@ -538,16 +548,16 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
       if (tickMs >= zoomRange.startMs && tickMs <= zoomRange.endMs) {
         const x = timeToX(tickMs);
 
-        // Downward tick mark
-        ctx.strokeStyle = '#94a3b8';
-        ctx.lineWidth = 1.5;
+        // Downward tick mark extending below the axis line
+        ctx.strokeStyle = '#64748b';
+        ctx.lineWidth = 1.2;
         ctx.beginPath();
-        ctx.moveTo(x, padding.top + chartH);
-        ctx.lineTo(x, padding.top + chartH + 6);
+        ctx.moveTo(x, axisY);
+        ctx.lineTo(x, axisY + 6);
         ctx.stroke();
 
         // Tick text label in IST
-        ctx.fillText(formatTimeIst(tickMs), x, padding.top + chartH + 9);
+        ctx.fillText(formatTimeIst(tickMs), x, axisY + 9);
       }
     }
 
@@ -555,9 +565,9 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
     ctx.fillStyle = '#64748b';
     ctx.font = '500 11px Inter, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('Shift time', padding.left + chartW / 2, padding.top + chartH + 28);
+    ctx.fillText('Shift time', padding.left + chartW / 2, axisY + 28);
 
-    // 6. Brush Zoom Selection Box
+    // 7. Brush Zoom Selection Box
     if (isSelecting && selectionBox) {
       const selX1 = Math.min(selectionBox.startX, selectionBox.currentX);
       const selW = Math.abs(selectionBox.currentX - selectionBox.startX);
@@ -571,6 +581,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
   }, [
     dimensions,
     padding,
+    axisGap,
     zoomRange,
     processedSegments,
     sortedProduces,
