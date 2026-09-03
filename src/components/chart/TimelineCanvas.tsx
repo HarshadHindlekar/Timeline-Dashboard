@@ -1,5 +1,18 @@
 import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import dayjs from 'dayjs';
+import {
+  Box,
+  IconButton,
+  Tooltip,
+  ButtonGroup,
+  Button,
+  Chip,
+} from '@mui/material';
+import {
+  ZoomIn as ZoomInIcon,
+  ZoomOut as ZoomOutIcon,
+  RestartAlt as ResetIcon,
+} from '@mui/icons-material';
 import { MachineIntervalsData } from '../../types/analytics';
 import { HoverTooltipData, TimelineTooltip } from './TimelineTooltip';
 import { SEGMENT_COLORS } from './TimelineLegend';
@@ -56,6 +69,10 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
   useEffect(() => {
     setZoomRange(defaultRange);
   }, [defaultRange]);
+
+  const isZoomed = useMemo(() => {
+    return zoomRange.startMs !== defaultRange.startMs || zoomRange.endMs !== defaultRange.endMs;
+  }, [zoomRange, defaultRange]);
 
   // Drag selection state for brush zoom
   const [isSelecting, setIsSelecting] = useState(false);
@@ -191,8 +208,6 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
   }, [intervals, lastActiveTimestampMs, defaultRange.endMs]);
 
   // 3. Precompute cumulative line points
-  // At shift start: count is 0.
-  // Each bucket's cumulative count is achieved at the END of the bucket (bucket_start + 1 hour)!
   const cumulativePoints = useMemo(() => {
     if (!intervals?.produce_counts || intervals.produce_counts.length === 0) return [];
 
@@ -254,6 +269,75 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
     }
   }, [showIndividualProduces, sortedProduces.length, cumulativePoints]);
 
+  // Zoom control helpers
+  const handleZoomIn = () => {
+    const span = zoomRange.endMs - zoomRange.startMs;
+    const centerMs = (zoomRange.startMs + zoomRange.endMs) / 2;
+    const newSpan = Math.max(60 * 1000 * 15, span * 0.65); // minimum 15 mins
+    const newStart = Math.max(defaultRange.startMs, centerMs - newSpan / 2);
+    const newEnd = Math.min(defaultRange.endMs, newStart + newSpan);
+    setZoomRange({ startMs: Math.round(newStart), endMs: Math.round(newEnd) });
+  };
+
+  const handleZoomOut = () => {
+    const span = zoomRange.endMs - zoomRange.startMs;
+    const centerMs = (zoomRange.startMs + zoomRange.endMs) / 2;
+    const newSpan = Math.min(defaultRange.endMs - defaultRange.startMs, span * 1.5);
+    let newStart = centerMs - newSpan / 2;
+    let newEnd = newStart + newSpan;
+    if (newStart < defaultRange.startMs) {
+      newStart = defaultRange.startMs;
+      newEnd = Math.min(defaultRange.endMs, newStart + newSpan);
+    }
+    if (newEnd > defaultRange.endMs) {
+      newEnd = defaultRange.endMs;
+      newStart = Math.max(defaultRange.startMs, newEnd - newSpan);
+    }
+    setZoomRange({ startMs: Math.round(newStart), endMs: Math.round(newEnd) });
+  };
+
+  const handleResetZoom = () => {
+    setZoomRange(defaultRange);
+  };
+
+  const handleZoomPreset = (hours: number) => {
+    const spanMs = hours * 3600000;
+    const startMs = defaultRange.startMs;
+    const endMs = Math.min(defaultRange.endMs, startMs + spanMs);
+    setZoomRange({ startMs, endMs });
+  };
+
+  // Mouse wheel zoom
+  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const mouseX = e.clientX - rect.left;
+    const chartW = dimensions.width - padding.left - padding.right;
+    if (mouseX < padding.left || mouseX > padding.left + chartW) return;
+
+    const span = zoomRange.endMs - zoomRange.startMs;
+    const mouseRatio = (mouseX - padding.left) / chartW;
+    const centerMs = zoomRange.startMs + mouseRatio * span;
+
+    const zoomFactor = e.deltaY < 0 ? 0.75 : 1.35;
+    const newSpan = Math.max(60 * 1000 * 10, Math.min(defaultRange.endMs - defaultRange.startMs, span * zoomFactor));
+
+    let newStart = centerMs - mouseRatio * newSpan;
+    let newEnd = newStart + newSpan;
+
+    if (newStart < defaultRange.startMs) {
+      newStart = defaultRange.startMs;
+      newEnd = Math.min(defaultRange.endMs, newStart + newSpan);
+    }
+    if (newEnd > defaultRange.endMs) {
+      newEnd = defaultRange.endMs;
+      newStart = Math.max(defaultRange.startMs, newEnd - newSpan);
+    }
+
+    setZoomRange({ startMs: Math.round(newStart), endMs: Math.round(newEnd) });
+  };
+
   // ResizeObserver for responsive canvas
   useEffect(() => {
     const handleResize = () => {
@@ -297,14 +381,11 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
       const span = zoomRange.endMs - zoomRange.startMs;
       if (span <= 0) return padding.left;
       const rawX = padding.left + ((ms - zoomRange.startMs) / span) * chartW;
-      // Strictly clamp between chart left and right boundaries
       return Math.max(padding.left, Math.min(padding.left + chartW, rawX));
     };
 
     const countToY = (count: number): number => {
       if (yAxisConfig.yMax <= 0) return padding.top + chartH;
-      // 0 maps to padding.top + chartH (bottom of chart box)
-      // yMax maps to padding.top (top of chart box)
       return padding.top + chartH - (count / yAxisConfig.yMax) * chartH;
     };
 
@@ -359,12 +440,10 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
     ctx.restore(); // END SEGMENT CLIP
 
     // 3. Draw Chart Box Outline & Horizontal Grid Lines
-    // Thin outer border enclosing the chart plotting area
     ctx.strokeStyle = '#e2e8f0';
     ctx.lineWidth = 1;
     ctx.strokeRect(padding.left, padding.top, chartW, chartH);
 
-    // Horizontal grid lines & Y labels
     ctx.font = '500 11px Inter, sans-serif';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
@@ -372,11 +451,9 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
     for (const val of yAxisConfig.ticks) {
       const y = countToY(val);
 
-      // Y-axis value label
       ctx.fillStyle = '#64748b';
       ctx.fillText(String(val), padding.left - 10, y);
 
-      // Grid line inside chart
       if (val > 0 && val < yAxisConfig.yMax) {
         ctx.strokeStyle = '#e2e8f0';
         ctx.lineWidth = 1;
@@ -397,7 +474,6 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
     if (!showIndividualProduces) {
       // MODE: Cumulative Line (Mockup 3 / SS 2)
       if (cumulativePoints.length > 1) {
-        // Draw blue line
         ctx.beginPath();
         ctx.strokeStyle = '#2563eb';
         ctx.lineWidth = 2.5;
@@ -416,13 +492,11 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
         }
         ctx.stroke();
 
-        // Draw points with circular nodes and rounded blue badges (SS 2)
         for (const pt of cumulativePoints) {
-          if (pt.isFlatExtension) continue; // Skip extension endpoint so only real points get nodes & badges
+          if (pt.isFlatExtension) continue;
           const x = timeToX(pt.epochMs);
           const y = countToY(pt.cumulative);
 
-          // White circular node with blue border
           ctx.beginPath();
           ctx.arc(x, y, 4.5, 0, Math.PI * 2);
           ctx.fillStyle = '#ffffff';
@@ -431,17 +505,16 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
           ctx.strokeStyle = '#2563eb';
           ctx.stroke();
 
-          // Value badge matching mockup (Image 2)
           if (showPointLabels) {
             const labelText = String(pt.cumulative);
             ctx.font = 'bold 9.5px Inter, sans-serif';
             const textWidth = ctx.measureText(labelText).width;
             const badgeW = textWidth + 10;
             const badgeH = 15;
-            // Position badge with boundary awareness so it never bleeds past chart edges
+
             let badgeX = x + 6;
             if (badgeX + badgeW > padding.left + chartW) {
-              badgeX = x - badgeW - 6; // Flip to left of node if near right edge
+              badgeX = x - badgeW - 6;
             }
             let badgeY = y - 7.5;
             if (badgeY < padding.top + 2) {
@@ -450,7 +523,6 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
               badgeY = y - badgeH - 4;
             }
 
-            // Blue pill background with crisp border
             ctx.fillStyle = '#1976d2';
             ctx.beginPath();
             ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 3.5);
@@ -459,7 +531,6 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
             ctx.lineWidth = 1;
             ctx.stroke();
 
-            // White text inside pill
             ctx.fillStyle = '#ffffff';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -481,14 +552,15 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
         if (p.result === 'FAIL') {
           visibleFails.push(p);
         } else {
-          const px = Math.floor(timeToX(p.epochMs));
+          // Adaptive binning based on zoom level
+          const px = Math.floor(timeToX(p.epochMs) * 2) / 2;
           if (!passBins.has(px)) {
             passBins.set(px, p);
           }
         }
       }
 
-      // PASS markers (Circles)
+      // PASS markers (Circles with blue stroke and white fill)
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = '#1d4ed8';
       ctx.lineWidth = 1.5;
@@ -498,7 +570,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
         const y = countToY(p.cumulativeIndex);
 
         ctx.beginPath();
-        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.arc(x, y, 3.5, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
       });
@@ -525,7 +597,6 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
       if (lastActiveTimestampMs >= zoomRange.startMs && lastActiveTimestampMs <= zoomRange.endMs) {
         const nowX = timeToX(lastActiveTimestampMs);
 
-        // Vertical boundary line
         ctx.strokeStyle = '#1976d2';
         ctx.lineWidth = 1.5;
         ctx.beginPath();
@@ -533,7 +604,6 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
         ctx.lineTo(nowX, padding.top + chartH);
         ctx.stroke();
 
-        // "NOW" badge on top
         ctx.fillStyle = '#1976d2';
         ctx.beginPath();
         ctx.roundRect(nowX - 17, padding.top - 22, 34, 16, 3);
@@ -557,50 +627,53 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
     ctx.lineTo(padding.left + chartW, axisY);
     ctx.stroke();
 
-    // Shift-Aligned Ticks: 08:30, 09:30, 11:30, 13:30, 15:30, 17:30, 19:00
     ctx.fillStyle = '#334155';
     ctx.font = '600 11px Inter, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
 
-    const startIst = dayjs(defaultRange.startMs);
-    const endIst = dayjs(defaultRange.endMs);
-    const totalShiftHours = endIst.diff(startIst, 'minute') / 60;
+    const startIst = dayjs(zoomRange.startMs);
+    const endIst = dayjs(zoomRange.endMs);
+    const totalViewHours = endIst.diff(startIst, 'minute') / 60;
 
+    // Dynamically calculate ticks based on current zoom range
     const tickMoments: dayjs.Dayjs[] = [startIst];
-    if (totalShiftHours >= 2) {
-      tickMoments.push(startIst.add(1, 'hour'));
-      let hourCursor = 3;
-      while (hourCursor < totalShiftHours - 0.5) {
-        tickMoments.push(startIst.add(hourCursor, 'hour'));
-        hourCursor += 2;
+    const stepHours = totalViewHours <= 2 ? 0.5 : totalViewHours <= 5 ? 1 : 2;
+
+    if (totalViewHours >= 1) {
+      let cursor = startIst.add(stepHours, 'hour');
+      while (cursor.isBefore(endIst.subtract(stepHours * 0.4, 'hour'))) {
+        tickMoments.push(cursor);
+        cursor = cursor.add(stepHours, 'hour');
       }
     }
     tickMoments.push(endIst);
 
     for (const tick of tickMoments) {
       const tickMs = tick.valueOf();
-      if (tickMs >= zoomRange.startMs && tickMs <= zoomRange.endMs) {
-        const x = timeToX(tickMs);
+      const x = timeToX(tickMs);
 
-        // Downward tick mark extending below the axis line
-        ctx.strokeStyle = '#64748b';
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        ctx.moveTo(x, axisY);
-        ctx.lineTo(x, axisY + 6);
-        ctx.stroke();
+      ctx.strokeStyle = '#64748b';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(x, axisY);
+      ctx.lineTo(x, axisY + 6);
+      ctx.stroke();
 
-        // Tick text label in IST
-        ctx.fillText(formatTimeIst(tickMs), x, axisY + 9);
-      }
+      ctx.fillText(formatTimeIst(tickMs), x, axisY + 9);
     }
 
     // X Axis Subtitle: Shift time
     ctx.fillStyle = '#64748b';
     ctx.font = '500 11px Inter, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('Shift time', padding.left + chartW / 2, axisY + 28);
+    ctx.fillText(
+      isZoomed
+        ? `Viewing ${formatTimeIst(zoomRange.startMs)} – ${formatTimeIst(zoomRange.endMs)} (Double-click to reset)`
+        : 'Shift time',
+      padding.left + chartW / 2,
+      axisY + 28
+    );
 
     // 7. Brush Zoom Selection Box
     if (isSelecting && selectionBox) {
@@ -609,7 +682,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
 
       ctx.fillStyle = 'rgba(37, 99, 235, 0.15)';
       ctx.strokeStyle = '#2563eb';
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 1.5;
       ctx.fillRect(selX1, padding.top, selW, chartH);
       ctx.strokeRect(selX1, padding.top, selW, chartH);
     }
@@ -618,6 +691,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
     padding,
     axisGap,
     zoomRange,
+    isZoomed,
     processedSegments,
     sortedProduces,
     cumulativePoints,
@@ -755,15 +829,15 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
       const x1 = Math.min(selectionBox.startX, selectionBox.currentX);
       const x2 = Math.max(selectionBox.startX, selectionBox.currentX);
 
-      if (x2 - x1 > 15) {
+      if (x2 - x1 > 12) {
         const span = zoomRange.endMs - zoomRange.startMs;
         const newStartMs = zoomRange.startMs + ((x1 - padding.left) / chartW) * span;
         const newEndMs = zoomRange.startMs + ((x2 - padding.left) / chartW) * span;
 
-        if (newEndMs - newStartMs >= 60 * 1000) {
+        if (newEndMs - newStartMs >= 60 * 1000 * 5) {
           setZoomRange({
-            startMs: Math.max(defaultRange.startMs, newStartMs),
-            endMs: Math.min(defaultRange.endMs, newEndMs),
+            startMs: Math.max(defaultRange.startMs, Math.round(newStartMs)),
+            endMs: Math.min(defaultRange.endMs, Math.round(newEndMs)),
           });
         }
       }
@@ -774,7 +848,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
   };
 
   const handleDoubleClick = () => {
-    setZoomRange(defaultRange);
+    handleResetZoom();
   };
 
   return (
@@ -786,6 +860,87 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
         userSelect: 'none',
       }}
     >
+      {/* Floating Interactive Zoom Toolbar */}
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 8,
+          right: 8,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          zIndex: 10,
+          backgroundColor: 'rgba(255, 255, 255, 0.92)',
+          backdropFilter: 'blur(6px)',
+          borderRadius: '8px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+          p: 0.5,
+        }}
+      >
+        {/* Quick Time Presets (especially useful when Show Individual Produces is ON) */}
+        {showIndividualProduces && (
+          <Box sx={{ display: 'flex', gap: 0.5, mr: 0.5 }}>
+            <Chip
+              label="1h"
+              size="small"
+              onClick={() => handleZoomPreset(1)}
+              variant="outlined"
+              sx={{ height: 24, fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+            />
+            <Chip
+              label="2h"
+              size="small"
+              onClick={() => handleZoomPreset(2)}
+              variant="outlined"
+              sx={{ height: 24, fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+            />
+            <Chip
+              label="Full"
+              size="small"
+              onClick={handleResetZoom}
+              variant={!isZoomed ? 'filled' : 'outlined'}
+              color={!isZoomed ? 'primary' : 'default'}
+              sx={{ height: 24, fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+            />
+          </Box>
+        )}
+
+        <ButtonGroup size="small" variant="outlined" sx={{ height: 26 }}>
+          <Tooltip title="Zoom In (or scroll wheel up)">
+            <IconButton size="small" onClick={handleZoomIn} sx={{ p: 0.4, borderRadius: 0 }}>
+              <ZoomInIcon sx={{ fontSize: '1.1rem' }} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Zoom Out (or scroll wheel down)">
+            <IconButton size="small" onClick={handleZoomOut} sx={{ p: 0.4, borderRadius: 0 }}>
+              <ZoomOutIcon sx={{ fontSize: '1.1rem' }} />
+            </IconButton>
+          </Tooltip>
+        </ButtonGroup>
+
+        {isZoomed && (
+          <Tooltip title="Reset to full shift window">
+            <Button
+              size="small"
+              variant="contained"
+              color="primary"
+              onClick={handleResetZoom}
+              startIcon={<ResetIcon sx={{ fontSize: '0.95rem !important' }} />}
+              sx={{
+                height: 26,
+                fontSize: '0.72rem',
+                textTransform: 'none',
+                fontWeight: 600,
+                px: 1,
+              }}
+            >
+              Reset
+            </Button>
+          </Tooltip>
+        )}
+      </Box>
+
       <canvas
         ref={canvasRef}
         style={{
@@ -803,6 +958,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
           setTooltipData(null);
         }}
         onDoubleClick={handleDoubleClick}
+        onWheel={handleWheel}
       />
 
       <TimelineTooltip data={tooltipData} containerWidth={dimensions.width} />
