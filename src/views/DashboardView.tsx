@@ -9,7 +9,7 @@ import {
   Fade,
 } from '@mui/material';
 import { SmartToy as BotIcon } from '@mui/icons-material';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { AppHeader } from '../components/common/AppHeader';
 import { FilterBar } from '../components/filters/FilterBar';
 import { TimelineSection } from '../components/chart/TimelineSection';
@@ -129,6 +129,7 @@ export const DashboardView: React.FC = () => {
       });
     },
     enabled: Boolean(activeEntity && shiftWindow),
+    placeholderData: keepPreviousData,
     retry: 2,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
@@ -166,6 +167,7 @@ export const DashboardView: React.FC = () => {
       });
     },
     enabled: Boolean(activeEntity && shiftWindow),
+    placeholderData: keepPreviousData,
     retry: 2,
   });
 

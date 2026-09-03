@@ -11,6 +11,8 @@ import {
   TableCell,
   Fade,
   LinearProgress,
+  Skeleton,
+  Box,
 } from '@mui/material';
 import { HourlySummaryColumn } from '../../types/analytics';
 import { HourMetrics } from '../../utils/segmentSlicer';
@@ -93,6 +95,9 @@ export const HourlySummaryTable: React.FC<HourlySummaryTableProps> = ({ columns,
     },
   ];
 
+  const hasColumns = columns && columns.length > 0;
+  const dummyColumns = Array.from({ length: 10 });
+
   return (
     <Fade in timeout={400}>
       <Card
@@ -104,7 +109,7 @@ export const HourlySummaryTable: React.FC<HourlySummaryTableProps> = ({ columns,
           mb: 4,
           position: 'relative',
           overflow: 'hidden',
-          transition: 'opacity 250ms ease-in-out',
+          transition: 'all 250ms ease-in-out',
         }}
       >
         {isFetching && (
@@ -116,105 +121,140 @@ export const HourlySummaryTable: React.FC<HourlySummaryTableProps> = ({ columns,
               right: 0,
               height: 3,
               zIndex: 10,
+              backgroundColor: '#e0f2fe',
+              '& .MuiLinearProgress-bar': {
+                backgroundColor: '#0284c7',
+              },
             }}
           />
         )}
-        <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, color: '#0f172a', fontSize: '1rem', mb: 2 }}>
-          Hourly Production & Downtime Summary
-        </Typography>
 
-        <TableContainer
-          sx={{
-            borderRadius: 1.5,
-            border: '1px solid #e2e8f0',
-            maxHeight: 520,
-            overflowX: 'auto',
-          }}
-        >
-          <Table size="small" stickyHeader>
-            <TableHead>
-              <TableRow>
-                <TableCell
-                  sx={{
-                    fontWeight: 700,
-                    backgroundColor: '#f8fafc',
-                    color: '#334155',
-                    fontSize: '0.8125rem',
-                    borderRight: '1px solid #e2e8f0',
-                    minWidth: 190,
-                    position: 'sticky',
-                    left: 0,
-                    zIndex: 3,
-                  }}
-                >
-                  Param
-                </TableCell>
-                {columns.map((col) => (
+        <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: '#0f172a', fontSize: '1rem' }}>
+              Hourly Production & Downtime Summary
+            </Typography>
+            {isFetching && (
+              <Typography variant="caption" sx={{ color: '#0284c7', fontWeight: 600, fontSize: '0.75rem' }}>
+                Updating metrics...
+              </Typography>
+            )}
+          </Box>
+
+          <TableContainer
+            sx={{
+              borderRadius: 1.5,
+              border: '1px solid #e2e8f0',
+              maxHeight: 540,
+              overflowX: 'auto',
+            }}
+          >
+            <Table size="small" stickyHeader>
+              <TableHead>
+                <TableRow>
                   <TableCell
-                    key={col.bucketIndex}
-                    align="center"
                     sx={{
                       fontWeight: 700,
                       backgroundColor: '#f8fafc',
-                      color: col.isFuture ? '#94a3b8' : '#1e293b',
-                      fontSize: '0.8125rem',
-                      whiteSpace: 'nowrap',
-                      minWidth: 110,
-                    }}
-                  >
-                    {col.label}
-                  </TableCell>
-                ))}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {rowConfigs.map((row, rIdx) => (
-                <TableRow
-                  key={row.key}
-                  sx={{
-                    backgroundColor: rIdx % 2 === 0 ? '#ffffff' : '#fcfdfd',
-                    '&:hover': { backgroundColor: '#f8fafc' },
-                  }}
-                >
-                  <TableCell
-                    sx={{
-                      fontWeight: row.bold ? 700 : 500,
-                      color: row.bold ? '#0f172a' : '#475569',
+                      color: '#334155',
                       fontSize: '0.8125rem',
                       borderRight: '1px solid #e2e8f0',
-                      backgroundColor: rIdx % 2 === 0 ? '#ffffff' : '#fcfdfd',
+                      minWidth: 190,
                       position: 'sticky',
                       left: 0,
-                      zIndex: 2,
+                      zIndex: 3,
                     }}
                   >
-                    {row.label}
+                    Param
                   </TableCell>
-                  {columns.map((col, cIdx) => {
-                    const metric = metrics[cIdx];
-                    const val = metric ? row.getValue(metric) : '';
-                    return (
-                      <TableCell
-                        key={col.bucketIndex}
-                        align="center"
-                        sx={{
-                          fontSize: '0.8125rem',
-                          color: col.isFuture ? '#cbd5e1' : '#1e293b',
-                          fontWeight: row.bold ? 700 : 400,
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {val !== null && val !== undefined ? val : ''}
-                      </TableCell>
-                    );
-                  })}
+                  {hasColumns
+                    ? columns.map((col) => (
+                        <TableCell
+                          key={col.bucketIndex}
+                          align="center"
+                          sx={{
+                            fontWeight: 700,
+                            backgroundColor: '#f8fafc',
+                            color: col.isFuture ? '#94a3b8' : '#1e293b',
+                            fontSize: '0.8125rem',
+                            whiteSpace: 'nowrap',
+                            minWidth: 110,
+                            transition: 'color 200ms ease',
+                          }}
+                        >
+                          {col.label}
+                        </TableCell>
+                      ))
+                    : dummyColumns.map((_, i) => (
+                        <TableCell key={i} align="center" sx={{ minWidth: 110, backgroundColor: '#f8fafc' }}>
+                          <Skeleton variant="text" width={70} sx={{ mx: 'auto' }} />
+                        </TableCell>
+                      ))}
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </CardContent>
+              </TableHead>
+
+              <TableBody
+                sx={{
+                  opacity: isFetching ? 0.55 : 1,
+                  filter: isFetching ? 'blur(0.4px)' : 'none',
+                  transition: 'opacity 220ms cubic-bezier(0.4, 0, 0.2, 1), filter 220ms ease',
+                }}
+              >
+                {rowConfigs.map((row, rIdx) => (
+                  <TableRow
+                    key={row.key}
+                    sx={{
+                      backgroundColor: rIdx % 2 === 0 ? '#ffffff' : '#fcfdfd',
+                      '&:hover': { backgroundColor: '#f8fafc' },
+                      transition: 'background-color 150ms ease',
+                    }}
+                  >
+                    <TableCell
+                      sx={{
+                        fontWeight: row.bold ? 700 : 500,
+                        color: row.bold ? '#0f172a' : '#475569',
+                        fontSize: '0.8125rem',
+                        borderRight: '1px solid #e2e8f0',
+                        backgroundColor: rIdx % 2 === 0 ? '#ffffff' : '#fcfdfd',
+                        position: 'sticky',
+                        left: 0,
+                        zIndex: 2,
+                      }}
+                    >
+                      {row.label}
+                    </TableCell>
+
+                    {hasColumns
+                      ? columns.map((col, cIdx) => {
+                          const metric = metrics[cIdx];
+                          const val = metric ? row.getValue(metric) : '';
+                          return (
+                            <TableCell
+                              key={col.bucketIndex}
+                              align="center"
+                              sx={{
+                                fontSize: '0.8125rem',
+                                color: col.isFuture ? '#cbd5e1' : '#1e293b',
+                                fontWeight: row.bold ? 700 : 400,
+                                whiteSpace: 'nowrap',
+                                transition: 'color 150ms ease',
+                              }}
+                            >
+                              {val !== null && val !== undefined ? val : ''}
+                            </TableCell>
+                          );
+                        })
+                      : dummyColumns.map((_, cIdx) => (
+                          <TableCell key={cIdx} align="center">
+                            <Skeleton variant="text" width={40} sx={{ mx: 'auto' }} />
+                          </TableCell>
+                        ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </CardContent>
       </Card>
     </Fade>
   );
