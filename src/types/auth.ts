@@ -22,3 +22,13 @@ export interface UserProfile {
   department_id?: string;
   department_name?: string;
 }
+
+export interface AuthContextType {
+  token: string | null;
+  user: UserProfile | null;
+  isLoading: boolean;
+  login: (credentials: LoginRequest) => Promise<void>;
+  logout: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
+}
+

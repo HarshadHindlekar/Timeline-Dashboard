@@ -1,16 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { UserProfile, LoginRequest } from '../types/auth';
+import { UserProfile, LoginRequest, AuthContextType } from '../types/auth';
 import * as authApi from '../api/auth';
 import { TOKEN_STORAGE_KEY } from '../api/client';
-
-interface AuthContextType {
-  token: string | null;
-  user: UserProfile | null;
-  isLoading: boolean;
-  login: (credentials: LoginRequest) => Promise<void>;
-  logout: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
-}
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
