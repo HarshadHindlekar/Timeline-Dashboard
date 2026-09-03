@@ -66,6 +66,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
     handleZoomPreset,
     handleWheel,
     handleMouseDown,
+    handleSelectionMove,
     handleMouseUp,
     handleMouseLeave,
   } = useTimelineZoom(defaultRange, canvasRef, dimensions, padding);
@@ -221,6 +222,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
     const chartH = dimensions.height - padding.top - padding.bottom;
 
     if (isSelecting) {
+      handleSelectionMove(mouseX);
       setTooltipData(null);
       return;
     }

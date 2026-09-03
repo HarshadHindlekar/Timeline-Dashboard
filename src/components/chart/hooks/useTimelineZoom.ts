@@ -100,18 +100,26 @@ export const useTimelineZoom = (
     }
   }, [canvasRef, dimensions.width, padding.left, padding.right]);
 
+  const handleSelectionMove = useCallback((mouseX: number) => {
+    if (isSelecting) {
+      setSelectionBox((prev) => (prev ? { ...prev, currentX: mouseX } : null));
+    }
+  }, [isSelecting]);
+
   const handleMouseUp = useCallback(() => {
     if (isSelecting && selectionBox) {
       const chartW = dimensions.width - padding.left - padding.right;
       const x1 = Math.min(selectionBox.startX, selectionBox.currentX);
       const x2 = Math.max(selectionBox.startX, selectionBox.currentX);
 
-      if (x2 - x1 > 12) {
+      // Require a drag of at least 8px to differentiate from a click
+      if (x2 - x1 > 8) {
         const span = zoomRange.endMs - zoomRange.startMs;
         const newStartMs = zoomRange.startMs + ((x1 - padding.left) / chartW) * span;
         const newEndMs = zoomRange.startMs + ((x2 - padding.left) / chartW) * span;
 
-        if (newEndMs - newStartMs >= 60 * 1000 * 5) {
+        // Minimum zoom span: 60 seconds (as specified in assignment brief)
+        if (newEndMs - newStartMs >= 60 * 1000) {
           setZoomRange({
             startMs: Math.max(defaultRange.startMs, Math.round(newStartMs)),
             endMs: Math.min(defaultRange.endMs, Math.round(newEndMs)),
@@ -142,6 +150,7 @@ export const useTimelineZoom = (
     handleZoomPreset,
     handleWheel,
     handleMouseDown,
+    handleSelectionMove,
     handleMouseUp,
     handleMouseLeave,
   };
