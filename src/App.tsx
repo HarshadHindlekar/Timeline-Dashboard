@@ -36,6 +36,29 @@ const theme = createTheme({
     borderRadius: 8,
   },
   components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        html: {
+          overflowY: 'scroll',
+          scrollbarGutter: 'stable',
+        },
+      },
+    },
+    MuiPopover: {
+      defaultProps: {
+        disableScrollLock: true,
+      },
+    },
+    MuiMenu: {
+      defaultProps: {
+        disableScrollLock: true,
+      },
+    },
+    MuiModal: {
+      defaultProps: {
+        disableScrollLock: true,
+      },
+    },
     MuiButton: {
       styleOverrides: {
         root: {

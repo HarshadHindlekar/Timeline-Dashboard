@@ -124,6 +124,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               label="ASSET LEVEL"
               onChange={(e) => onLevelChange(e.target.value as number | 'all')}
               sx={{ fontSize: '0.85rem' }}
+              MenuProps={{ disableScrollLock: true }}
             >
               {levelOptions.map((opt) => (
                 <MenuItem key={opt.value} value={opt.value} sx={{ fontSize: '0.85rem' }}>
@@ -147,6 +148,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                 if (found) onAssetChange(found);
               }}
               sx={{ fontSize: '0.85rem' }}
+              MenuProps={{ disableScrollLock: true }}
             >
               {filteredAssets.map((asset) => (
                 <MenuItem key={asset.id} value={asset.id} sx={{ fontSize: '0.85rem' }}>
@@ -174,6 +176,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                 }
               }}
               sx={{ fontSize: '0.85rem' }}
+              MenuProps={{ disableScrollLock: true }}
             >
               <MenuItem value="none" sx={{ fontSize: '0.85rem' }}>
                 —
@@ -214,6 +217,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                 if (found) onShiftChange(found);
               }}
               sx={{ fontSize: '0.85rem' }}
+              MenuProps={{ disableScrollLock: true }}
             >
               {shifts.map((shift) => (
                 <MenuItem key={shift.id} value={shift.id} sx={{ fontSize: '0.85rem' }}>
@@ -240,8 +244,9 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               <Select
                 value={autoRefreshInterval}
                 onChange={(e) => onAutoRefreshIntervalChange(Number(e.target.value))}
-                sx={{ fontSize: '0.75rem', height: 32 }}
+                sx={{ fontSize: '0.8rem', height: 32 }}
                 disabled={!autoRefreshEnabled}
+                MenuProps={{ disableScrollLock: true }}
               >
                 <MenuItem value={15} sx={{ fontSize: '0.75rem' }}>15 sec</MenuItem>
                 <MenuItem value={30} sx={{ fontSize: '0.75rem' }}>30 sec</MenuItem>
