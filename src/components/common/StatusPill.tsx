@@ -1,10 +1,7 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 
-interface StatusPillProps {
-  label: string;
-  variant?: 'primary' | 'neutral';
-}
+import { StatusPillProps } from '../../types/common';
 
 export const StatusPill: React.FC<StatusPillProps> = ({ label, variant = 'primary' }) => {
   const isPrimary = variant === 'primary';

@@ -1,29 +1,8 @@
 import React from 'react';
 import { Paper, Typography, Box, Chip } from '@mui/material';
 
-export interface HoverTooltipData {
-  x: number;
-  y: number;
-  type: 'produce' | 'segment';
-  produce?: {
-    id: string;
-    timestampIst: string;
-    result: 'PASS' | 'FAIL';
-    partModelId: string;
-  };
-  segment?: {
-    title: string;
-    type: string;
-    durationFormatted: string;
-    rangeIst: string;
-    color: string;
-  };
-}
-
-interface TimelineTooltipProps {
-  data: HoverTooltipData | null;
-  containerWidth: number;
-}
+import { HoverTooltipData, TimelineTooltipProps } from '../../types/chart';
+export type { HoverTooltipData, TimelineTooltipProps };
 
 export const TimelineTooltip: React.FC<TimelineTooltipProps> = ({ data, containerWidth }) => {
   if (!data) return null;

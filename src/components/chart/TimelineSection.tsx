@@ -10,21 +10,10 @@ import {
   Fade,
 } from '@mui/material';
 import { WarningAmber as WarningIcon } from '@mui/icons-material';
-import { MachineIntervalsData } from '../../types/analytics';
 import { TimelineLegend } from './TimelineLegend';
 import { TimelineCanvas } from './TimelineCanvas';
 import { formatDateTimeIst } from '../../utils/timezone';
-
-interface TimelineSectionProps {
-  intervals: MachineIntervalsData | null | undefined;
-  windowStartUtc: string;
-  windowEndUtc: string;
-  showIndividualProduces: boolean;
-  showPointLabels: boolean;
-  isFetching?: boolean;
-  onToggleIndividualProduces: (val: boolean) => void;
-  onTogglePointLabels: (val: boolean) => void;
-}
+import { TimelineSectionProps } from '../../types/chart';
 
 export const TimelineSection: React.FC<TimelineSectionProps> = ({
   intervals,

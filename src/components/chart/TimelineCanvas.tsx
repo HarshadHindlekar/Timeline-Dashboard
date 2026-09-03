@@ -13,36 +13,16 @@ import {
   ZoomOut as ZoomOutIcon,
   RestartAlt as ResetIcon,
 } from '@mui/icons-material';
-import { MachineIntervalsData } from '../../types/analytics';
-import { HoverTooltipData, TimelineTooltip } from './TimelineTooltip';
+import {
+  TimelineCanvasProps,
+  ProcessedProduce,
+  ProcessedSegment,
+  HoverTooltipData,
+} from '../../types/chart';
+import { TimelineTooltip } from './TimelineTooltip';
 import { SEGMENT_COLORS } from './TimelineLegend';
 import { formatTimeIst, formatDateTimeIst } from '../../utils/timezone';
 import { categorizeSegment } from '../../utils/segmentSlicer';
-
-interface TimelineCanvasProps {
-  intervals: MachineIntervalsData | null | undefined;
-  windowStartUtc: string;
-  windowEndUtc: string;
-  showIndividualProduces: boolean;
-  showPointLabels: boolean;
-}
-
-interface ProcessedProduce {
-  id: string;
-  epochMs: number;
-  result: 'PASS' | 'FAIL';
-  partModelId: string;
-  produceType: string;
-  cumulativeIndex: number;
-}
-
-interface ProcessedSegment {
-  startMs: number;
-  endMs: number;
-  type: string;
-  title: string;
-  color: string;
-}
 
 export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
   intervals,

@@ -14,21 +14,7 @@ import {
   Skeleton,
   Box,
 } from '@mui/material';
-import { HourlySummaryColumn } from '../../types/analytics';
-import { HourMetrics } from '../../utils/segmentSlicer';
-
-interface HourlySummaryTableProps {
-  columns: HourlySummaryColumn[];
-  metrics: HourMetrics[];
-  isFetching?: boolean;
-}
-
-interface RowConfig {
-  key: string;
-  label: string;
-  getValue: (m: HourMetrics) => string | number | null;
-  bold?: boolean;
-}
+import { HourlySummaryTableProps, RowConfig } from '../../types/table';
 
 export const HourlySummaryTable: React.FC<HourlySummaryTableProps> = ({ columns, metrics, isFetching }) => {
   const rowConfigs: RowConfig[] = [
