@@ -213,12 +213,13 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
 
     for (const [startMs, count] of sortedBuckets) {
       runningTotal += count;
-      const endMs = startMs + 3600000;
+      // Clamp endMs strictly to shift end (so half-hour final buckets never overshoot 19:00!)
+      const endMs = Math.min(startMs + 3600000, defaultRange.endMs);
       points.push({ epochMs: endMs, cumulative: runningTotal });
     }
 
     return points;
-  }, [intervals?.produce_counts, defaultRange.startMs]);
+  }, [intervals?.produce_counts, defaultRange.startMs, defaultRange.endMs]);
 
   // Y Scale matching mockup: 0, 250, 500
   const yAxisConfig = useMemo(() => {
@@ -283,7 +284,9 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
     const timeToX = (ms: number): number => {
       const span = zoomRange.endMs - zoomRange.startMs;
       if (span <= 0) return padding.left;
-      return padding.left + ((ms - zoomRange.startMs) / span) * chartW;
+      const rawX = padding.left + ((ms - zoomRange.startMs) / span) * chartW;
+      // Strictly clamp between chart left and right boundaries
+      return Math.max(padding.left, Math.min(padding.left + chartW, rawX));
     };
 
     const countToY = (count: number): number => {
@@ -312,13 +315,15 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
         ctx.fillStyle = seg.color;
         ctx.fillRect(x1, padding.top, segW, chartH);
 
-        // Vertical label if wide enough
-        if (segW >= 20) {
+        // Vertical label only if wide enough to be readable (>= 34px)
+        if (segW >= 34) {
           ctx.save();
           ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 9px Inter, sans-serif';
+          ctx.font = '700 9.5px Inter, sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+          ctx.shadowBlur = 2.5;
 
           const textX = x1 + segW / 2;
           const textY = padding.top + chartH / 2;
@@ -411,9 +416,17 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
             const textWidth = ctx.measureText(labelText).width;
             const badgeW = textWidth + 10;
             const badgeH = 15;
-            // Position badge to the right of node
-            const badgeX = x + 6;
-            const badgeY = y - 7.5;
+            // Position badge with boundary awareness so it never bleeds past chart edges
+            let badgeX = x + 6;
+            if (badgeX + badgeW > padding.left + chartW) {
+              badgeX = x - badgeW - 6; // Flip to left of node if near right edge
+            }
+            let badgeY = y - 7.5;
+            if (badgeY < padding.top + 2) {
+              badgeY = y + 7;
+            } else if (badgeY + badgeH > padding.top + chartH - 2) {
+              badgeY = y - badgeH - 4;
+            }
 
             // Blue pill background with crisp border
             ctx.fillStyle = '#1976d2';
