@@ -267,21 +267,6 @@ export const TimelineSection: React.FC<TimelineSectionProps> = ({
           >
             Colored lines = cumulative production (OK + NG) per part model
           </Box>
-          {showIndividualProduces && (
-            <Box
-              sx={{
-                px: 1.2,
-                py: 0.3,
-                borderRadius: '12px',
-                border: '1px solid #e2e8f0',
-                bgcolor: '#f8fafc',
-                fontSize: '0.725rem',
-                color: '#475569',
-              }}
-            >
-              Circles = FIRST (PASS) · Crosses = FIRST (FAIL) · Triangles = WIP
-            </Box>
-          )}
         </Box>
 
         {/* Bottom Status Information Badges */}
