@@ -211,8 +211,8 @@ export const HourlySummaryTable: React.FC<HourlySummaryTableProps> = ({ columns,
                   >
                     <TableCell
                       sx={{
-                        fontWeight: row.bold ? 700 : 500,
-                        color: row.bold ? '#0f172a' : '#475569',
+                        fontWeight: 500,
+                        color: '#475569',
                         fontSize: '0.8125rem',
                         borderRight: '1px solid #e2e8f0',
                         backgroundColor: rIdx % 2 === 0 ? '#ffffff' : '#fcfdfd',
@@ -234,8 +234,8 @@ export const HourlySummaryTable: React.FC<HourlySummaryTableProps> = ({ columns,
                               align="center"
                               sx={{
                                 fontSize: '0.8125rem',
-                                color: col.isFuture ? '#cbd5e1' : '#1e293b',
-                                fontWeight: row.bold ? 700 : 400,
+                                color: col.isFuture ? '#cbd5e1' : '#0f172a',
+                                fontWeight: 700,
                                 whiteSpace: 'nowrap',
                                 transition: 'color 150ms ease',
                               }}
