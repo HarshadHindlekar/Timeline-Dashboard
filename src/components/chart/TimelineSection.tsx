@@ -43,6 +43,8 @@ export const TimelineSection: React.FC<TimelineSectionProps> = ({
     return Array.from(models);
   }, [intervals]);
 
+  const displayPartModel = partModels.length > 0 ? (partModels[0].length > 10 ? `${partModels[0].slice(0, 6)}...` : partModels[0]) : 'D22';
+
   // Find last observed produce timestamp
   const lastProduceTimestamp = React.useMemo(() => {
     let latest: string | null = null;
@@ -55,7 +57,6 @@ export const TimelineSection: React.FC<TimelineSectionProps> = ({
         }
       }
     } else if (intervals?.produce_counts && intervals.produce_counts.length > 0) {
-      // Fallback to highest bucket_start
       const sorted = [...intervals.produce_counts].sort((a, b) => b.bucket_start.localeCompare(a.bucket_start));
       latest = sorted[0].bucket_start;
     }
@@ -89,50 +90,126 @@ export const TimelineSection: React.FC<TimelineSectionProps> = ({
       }}
     >
       <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-        {/* Title & Legend Row */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5, flexWrap: 'wrap' }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: '#0f172a', fontSize: '1rem' }}>
+        {/* Row 1: Title on left, Color Chips on right (Mockup 3 & 4) */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            mb: 1.5,
+            flexWrap: 'wrap',
+            gap: 1.5,
+          }}
+        >
+          <Typography variant="h6" sx={{ fontWeight: 700, color: '#0f172a', fontSize: '0.95rem' }}>
             Production History
           </Typography>
-          <TimelineLegend
-            showIndividualProduces={showIndividualProduces}
-            partModels={partModels}
-          />
+          <TimelineLegend />
         </Box>
 
-        {/* Toggles Row */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 1 }}>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={showPointLabels}
-                onChange={(e) => onTogglePointLabels(e.target.checked)}
-                size="small"
-                color="primary"
+        {/* Row 2: Part Models + Toggles */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 2.5,
+            mb: 1.5,
+          }}
+        >
+          {/* Part Model indicator */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="caption" sx={{ fontWeight: 600, color: '#334155' }}>
+              Part Models:
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Box
+                sx={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  backgroundColor: '#1976d2',
+                }}
               />
-            }
-            label={
-              <Typography variant="caption" sx={{ fontWeight: 600, color: '#334155' }}>
-                Point labels
+              <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600 }}>
+                {displayPartModel}
               </Typography>
-            }
-          />
+            </Box>
+          </Box>
 
-          <FormControlLabel
-            control={
-              <Switch
-                checked={showIndividualProduces}
-                onChange={(e) => onToggleIndividualProduces(e.target.checked)}
-                size="small"
-                color="primary"
+          {/* Individual Produces Legend (when toggle is ON) */}
+          {showIndividualProduces && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Box
+                  sx={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: '50%',
+                    backgroundColor: '#64748b',
+                  }}
+                />
+                <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600 }}>
+                  OK
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Typography variant="caption" sx={{ color: '#e11d48', fontWeight: 800, fontSize: '0.85rem', lineHeight: 1 }}>
+                  ✕
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#e11d48', fontWeight: 700 }}>
+                  FAIL
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.75rem', lineHeight: 1 }}>
+                  ▲
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#94a3b8', fontWeight: 600 }}>
+                  WIP
+                </Typography>
+              </Box>
+            </Box>
+          )}
+
+          {/* Toggles */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, ml: { sm: 'auto' } }}>
+            {!showIndividualProduces && (
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={showPointLabels}
+                    onChange={(e) => onTogglePointLabels(e.target.checked)}
+                    size="small"
+                    color="primary"
+                  />
+                }
+                label={
+                  <Typography variant="caption" sx={{ fontWeight: 600, color: '#334155' }}>
+                    Point labels
+                  </Typography>
+                }
+                sx={{ mr: 0 }}
               />
-            }
-            label={
-              <Typography variant="caption" sx={{ fontWeight: 600, color: '#334155' }}>
-                Show Individual produces
-              </Typography>
-            }
-          />
+            )}
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={showIndividualProduces}
+                  onChange={(e) => onToggleIndividualProduces(e.target.checked)}
+                  size="small"
+                  color="primary"
+                />
+              }
+              label={
+                <Typography variant="caption" sx={{ fontWeight: 600, color: '#334155' }}>
+                  Show Individual produces
+                </Typography>
+              }
+              sx={{ mr: 0 }}
+            />
+          </Box>
         </Box>
 
         {/* Chart Canvas Area */}
@@ -194,7 +271,7 @@ export const TimelineSection: React.FC<TimelineSectionProps> = ({
                 color: '#475569',
               }}
             >
-              Circles = FIRST (PASS) · Crosses = FIRST (FAIL)
+              Circles = FIRST (PASS) · Crosses = FIRST (FAIL) · Triangles = WIP
             </Box>
           )}
         </Box>
@@ -237,7 +314,7 @@ export const TimelineSection: React.FC<TimelineSectionProps> = ({
               }}
             >
               <WarningIcon sx={{ fontSize: '1rem', color: '#ea580c' }} />
-              {unknownStats.count} unknown segments · {unknownStats.minutes} min
+              {unknownStats.count} unknown segments · {unknownStats.minutes} min — click a segment to classify
             </Box>
           )}
         </Box>

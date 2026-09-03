@@ -1,8 +1,6 @@
 import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import dayjs from 'dayjs';
-import {
-  MachineIntervalsData,
-} from '../../types/analytics';
+import { MachineIntervalsData } from '../../types/analytics';
 import { HoverTooltipData, TimelineTooltip } from './TimelineTooltip';
 import { SEGMENT_COLORS } from './TimelineLegend';
 import { formatTimeIst, formatDateTimeIst, getNowIst } from '../../utils/timezone';
@@ -22,6 +20,7 @@ interface ProcessedProduce {
   result: 'PASS' | 'FAIL';
   partModelId: string;
   produceType: string;
+  cumulativeIndex: number;
 }
 
 interface ProcessedSegment {
@@ -43,7 +42,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Canvas dimensions
-  const [dimensions, setDimensions] = useState({ width: 1000, height: 260 });
+  const [dimensions, setDimensions] = useState({ width: 1000, height: 280 });
 
   // Zoom range state [startMs, endMs]
   const defaultRange = useMemo(() => {
@@ -54,7 +53,6 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
 
   const [zoomRange, setZoomRange] = useState<{ startMs: number; endMs: number }>(defaultRange);
 
-  // Update zoom range when shift window changes
   useEffect(() => {
     setZoomRange(defaultRange);
   }, [defaultRange]);
@@ -67,17 +65,24 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
   const [tooltipData, setTooltipData] = useState<HoverTooltipData | null>(null);
 
   // Chart padding
-  const padding = useMemo(() => ({ top: 30, right: 30, bottom: 40, left: 55 }), []);
+  const padding = useMemo(() => ({ top: 35, right: 30, bottom: 45, left: 55 }), []);
 
-  // 1. Preprocess and sort all individual produces once
+  // 1. Preprocess and sort all individual produces once, assigning cumulative index
   const sortedProduces = useMemo<ProcessedProduce[]>(() => {
     if (!intervals?.produces || intervals.produces.length === 0) return [];
 
-    const items: ProcessedProduce[] = [];
+    const rawList: {
+      id: string;
+      epochMs: number;
+      result: 'PASS' | 'FAIL';
+      partModelId: string;
+      produceType: string;
+    }[] = [];
+
     for (const group of intervals.produces) {
       if (group.produces) {
         for (const p of group.produces) {
-          items.push({
+          rawList.push({
             id: p.produce_id,
             epochMs: dayjs(p.first_seen_ts).valueOf(),
             result: p.result,
@@ -88,11 +93,16 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
       }
     }
 
-    // Sort by timestamp ascending for binary search
-    return items.sort((a, b) => a.epochMs - b.epochMs);
+    // Sort by timestamp ascending
+    rawList.sort((a, b) => a.epochMs - b.epochMs);
+
+    return rawList.map((p, idx) => ({
+      ...p,
+      cumulativeIndex: idx + 1,
+    }));
   }, [intervals?.produces]);
 
-  // 2. Preprocess segments
+  // 2. Preprocess segments with clean titles (matching mockup)
   const processedSegments = useMemo<ProcessedSegment[]>(() => {
     if (!intervals) return [];
     const list: ProcessedSegment[] = [];
@@ -100,12 +110,13 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
     // Runtimes
     for (const r of intervals.runtimes || []) {
       const cat = categorizeSegment(r, 'runtime');
+      const isUnplanned = cat === 'unknown_unplanned_production';
       list.push({
         startMs: dayjs(r.start_at).valueOf(),
         endMs: dayjs(r.end_at).valueOf(),
         type: r.type,
-        title: cat === 'unknown_unplanned_production' ? 'Unplanned Production' : 'Runtime',
-        color: cat === 'unknown_unplanned_production' ? SEGMENT_COLORS.unplannedProduction : SEGMENT_COLORS.runtime,
+        title: isUnplanned ? 'UNKNOWN UNPLANNED PRODUCTION' : 'RUNTIME',
+        color: isUnplanned ? SEGMENT_COLORS.unplannedProduction : SEGMENT_COLORS.runtime,
       });
     }
 
@@ -113,11 +124,17 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
     for (const d of intervals.downtimes || []) {
       const cat = categorizeSegment(d, 'downtime');
       const isUnknown = cat === 'unknown_downtime';
+      const nameUpper = (d.downtime_name || '').toUpperCase();
+      let title = isUnknown ? 'UNKNOWN' : 'DOWNTIME';
+      if (nameUpper.includes('TEA')) title = 'TEA BREAK';
+      else if (nameUpper.includes('LUNCH')) title = 'LUNCH BREAK';
+      else if (nameUpper.includes('PLANNED')) title = 'PLANNED DOWNTIME';
+
       list.push({
         startMs: dayjs(d.start_at).valueOf(),
         endMs: dayjs(d.end_at).valueOf(),
         type: d.type,
-        title: isUnknown ? 'Unknown Downtime' : 'Planned Downtime',
+        title,
         color: isUnknown ? SEGMENT_COLORS.unknownDowntime : SEGMENT_COLORS.plannedDowntime,
       });
     }
@@ -128,7 +145,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
         startMs: dayjs(s.start_at).valueOf(),
         endMs: dayjs(s.end_at).valueOf(),
         type: 'stoppage',
-        title: 'Minor Stoppage',
+        title: 'STOPPAGE',
         color: SEGMENT_COLORS.minorStoppage,
       });
     }
@@ -140,7 +157,6 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
   const cumulativePoints = useMemo(() => {
     if (!intervals?.produce_counts || intervals.produce_counts.length === 0) return [];
 
-    // Group produce counts by bucket_start
     const bucketsMap = new Map<number, number>();
     for (const count of intervals.produce_counts) {
       const ms = dayjs(count.bucket_start).valueOf();
@@ -154,8 +170,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
     const points: { epochMs: number; cumulative: number }[] = [];
 
     // Start with 0 at shift start
-    const shiftStartMs = defaultRange.startMs;
-    points.push({ epochMs: shiftStartMs, cumulative: 0 });
+    points.push({ epochMs: defaultRange.startMs, cumulative: 0 });
 
     for (const [ms, count] of sortedBuckets) {
       runningTotal += count;
@@ -168,22 +183,24 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
   // Max cumulative count for Y scale
   const maxCumulative = useMemo(() => {
     if (showIndividualProduces && sortedProduces.length > 0) {
-      return sortedProduces.length;
+      const highest = sortedProduces.length;
+      return Math.max(Math.ceil(highest / 100) * 100, 100);
     }
     if (cumulativePoints.length > 0) {
-      return Math.max(...cumulativePoints.map((p) => p.cumulative), 10);
+      const highest = Math.max(...cumulativePoints.map((p) => p.cumulative));
+      return Math.max(Math.ceil(highest / 50) * 50, 50);
     }
-    return 100;
+    return 500;
   }, [showIndividualProduces, sortedProduces.length, cumulativePoints]);
 
-  // Handle ResizeObserver
+  // ResizeObserver for responsive canvas
   useEffect(() => {
     const handleResize = () => {
       if (containerRef.current) {
         const { clientWidth } = containerRef.current;
         setDimensions({
           width: Math.max(clientWidth, 600),
-          height: 260,
+          height: 280,
         });
       }
     };
@@ -232,7 +249,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
     ctx.rect(padding.left, padding.top, chartW, chartH);
     ctx.clip();
 
-    // 1. Draw segment bands
+    // 1. Draw segment bands spanning entire vertical chart area
     for (const seg of processedSegments) {
       const x1 = Math.max(timeToX(seg.startMs), padding.left);
       const x2 = Math.min(timeToX(seg.endMs), padding.left + chartW);
@@ -243,21 +260,19 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
         ctx.fillRect(x1, padding.top, segW, chartH);
 
         // Vertical label if wide enough
-        if (segW >= 24) {
+        if (segW >= 22) {
           ctx.save();
           ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 10px Inter, sans-serif';
+          ctx.font = 'bold 9px Inter, sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
-          // Rotate text vertically
           const textX = x1 + segW / 2;
           const textY = padding.top + chartH / 2;
           ctx.translate(textX, textY);
           ctx.rotate(-Math.PI / 2);
 
-          const labelText = seg.title.toUpperCase();
-          ctx.fillText(labelText, 0, 0);
+          ctx.fillText(seg.title, 0, 0);
           ctx.restore();
         }
       }
@@ -265,7 +280,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
 
     // 2. Draw Cumulative Line or Individual Produces
     if (!showIndividualProduces) {
-      // Draw cumulative line
+      // MODE: Cumulative Line (Show individual produces is OFF)
       if (cumulativePoints.length > 1) {
         ctx.beginPath();
         ctx.strokeStyle = '#2563eb';
@@ -285,11 +300,12 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
         }
         ctx.stroke();
 
-        // Draw points
+        // Draw points with blue pill badges
         for (const pt of cumulativePoints) {
           const x = timeToX(pt.epochMs);
           const y = countToY(pt.cumulative);
 
+          // Marker circle: white center with blue ring
           ctx.beginPath();
           ctx.arc(x, y, 4.5, 0, Math.PI * 2);
           ctx.fillStyle = '#ffffff';
@@ -298,21 +314,33 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
           ctx.strokeStyle = '#2563eb';
           ctx.stroke();
 
-          // Value label
+          // Value badge matching mockup (Image 3)
           if (showPointLabels) {
-            ctx.fillStyle = '#1e3a8a';
-            ctx.font = '600 10px Inter, sans-serif';
+            const labelText = String(pt.cumulative);
+            ctx.font = 'bold 9px Inter, sans-serif';
+            const textWidth = ctx.measureText(labelText).width;
+            const badgeW = textWidth + 8;
+            const badgeH = 14;
+            const badgeX = x + 6;
+            const badgeY = y - 7;
+
+            // Blue pill background
+            ctx.fillStyle = '#2563eb';
+            ctx.beginPath();
+            ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 3);
+            ctx.fill();
+
+            // White text inside pill
+            ctx.fillStyle = '#ffffff';
             ctx.textAlign = 'center';
-            ctx.fillText(String(pt.cumulative), x, y - 8);
+            ctx.textBaseline = 'middle';
+            ctx.fillText(labelText, badgeX + badgeW / 2, badgeY + badgeH / 2);
           }
         }
       }
     } else {
-      // SHOW INDIVIDUAL PRODUCES (10,000 - 20,000 markers)
-      // HIGH PERFORMANCE BINNING ENGINE:
-      // STRICT RULE 1: Never drop a FAIL marker!
-      // STRICT RULE 2: Pre-resolved geometry, zero date parsing in render loop.
-
+      // MODE: Individual Produces ON (Mockup 4)
+      // Produces are plotted along the rising cumulative diagonal!
       const passBins = new Map<number, ProcessedProduce>();
       const visibleFails: ProcessedProduce[] = [];
 
@@ -323,10 +351,10 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
         }
 
         if (p.result === 'FAIL') {
-          // ALWAYS RENDER 100% OF FAILS
+          // ALWAYS PRESERVE 100% OF FAIL MARKERS
           visibleFails.push(p);
         } else {
-          // Bin PASS markers into screen pixels
+          // Sub-pixel screen binning for PASS
           const px = Math.floor(timeToX(p.epochMs));
           if (!passBins.has(px)) {
             passBins.set(px, p);
@@ -334,15 +362,14 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
         }
       }
 
-      // Draw PASS markers (Circles)
+      // Draw PASS markers (Circles with blue stroke and white fill)
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = '#1d4ed8';
       ctx.lineWidth = 1.5;
 
       passBins.forEach((p) => {
         const x = timeToX(p.epochMs);
-        // Distribute Y slightly or along cumulative progression
-        const y = padding.top + chartH * 0.7;
+        const y = countToY(p.cumulativeIndex);
 
         ctx.beginPath();
         ctx.arc(x, y, 3, 0, Math.PI * 2);
@@ -350,15 +377,14 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
         ctx.stroke();
       });
 
-      // Draw FAIL markers (Crosses / Red circles with high visibility)
+      // Draw FAIL markers (Prominent Red Crosses '✕')
       ctx.strokeStyle = '#e11d48';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2.5;
       for (const p of visibleFails) {
         const x = timeToX(p.epochMs);
-        const y = padding.top + chartH * 0.7;
+        const y = countToY(p.cumulativeIndex);
 
-        // Draw cross '✕'
-        const size = 5;
+        const size = 5.5;
         ctx.beginPath();
         ctx.moveTo(x - size, y - size);
         ctx.lineTo(x + size, y + size);
@@ -368,7 +394,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
       }
     }
 
-    // 3. Draw "NOW" indicator if inside zoom window
+    // 3. Draw "NOW" indicator badge if shift window contains current time
     const nowMs = getNowIst().valueOf();
     if (nowMs >= zoomRange.startMs && nowMs <= zoomRange.endMs) {
       const nowX = timeToX(nowMs);
@@ -379,7 +405,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
       ctx.moveTo(nowX, padding.top);
       ctx.lineTo(nowX, padding.top + chartH);
       ctx.stroke();
-      ctx.setLineDash([]); // Reset dash
+      ctx.setLineDash([]);
 
       // "NOW" badge at top
       ctx.fillStyle = '#2563eb';
@@ -398,40 +424,55 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
     ctx.restore();
 
     // 4. Draw Axes and Grid
-    ctx.strokeStyle = '#e2e8f0';
+    ctx.strokeStyle = '#cbd5e1';
     ctx.lineWidth = 1;
 
-    // Bottom axis line
+    // Bottom horizontal axis line
     ctx.beginPath();
     ctx.moveTo(padding.left, padding.top + chartH);
     ctx.lineTo(padding.left + chartW, padding.top + chartH);
     ctx.stroke();
 
-    // Time Axis Ticks (IST)
-    const tickCount = Math.max(4, Math.floor(chartW / 120));
-    const timeStep = (zoomRange.endMs - zoomRange.startMs) / tickCount;
+    // Clean Shift-Aligned Ticks (IST)
+    const spanMs = zoomRange.endMs - zoomRange.startMs;
+    const spanHours = spanMs / (3600 * 1000);
+    // Determine clean step: 1 hour, 2 hours, or 3 hours
+    const hourStep = spanHours <= 6 ? 1 : spanHours <= 14 ? 2 : 3;
 
     ctx.fillStyle = '#64748b';
     ctx.font = '500 11px Inter, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
 
-    for (let i = 0; i <= tickCount; i++) {
-      const tickMs = zoomRange.startMs + i * timeStep;
-      const x = timeToX(tickMs);
+    const startIst = dayjs(zoomRange.startMs);
+    let currTick = startIst;
 
-      // Tick mark
+    // First tick at start
+    const xStart = timeToX(currTick.valueOf());
+    ctx.fillText(formatTimeIst(currTick.valueOf()), xStart, padding.top + chartH + 7);
+
+    // Intermediate ticks at clean hour multiples
+    currTick = currTick.add(hourStep, 'hour');
+    while (currTick.valueOf() < zoomRange.endMs - 30 * 60 * 1000) {
+      const xTick = timeToX(currTick.valueOf());
       ctx.beginPath();
-      ctx.moveTo(x, padding.top + chartH);
-      ctx.lineTo(x, padding.top + chartH + 5);
+      ctx.moveTo(xTick, padding.top + chartH);
+      ctx.lineTo(xTick, padding.top + chartH + 5);
       ctx.stroke();
 
-      // Tick label in IST
-      const label = formatTimeIst(tickMs);
-      ctx.fillText(label, x, padding.top + chartH + 8);
+      ctx.fillText(formatTimeIst(currTick.valueOf()), xTick, padding.top + chartH + 7);
+      currTick = currTick.add(hourStep, 'hour');
     }
 
-    // Y Axis labels (Cumulative production count)
+    // Final tick at end of window
+    const xEnd = timeToX(zoomRange.endMs);
+    ctx.beginPath();
+    ctx.moveTo(xEnd, padding.top + chartH);
+    ctx.lineTo(xEnd, padding.top + chartH + 5);
+    ctx.stroke();
+    ctx.fillText(formatTimeIst(zoomRange.endMs), xEnd, padding.top + chartH + 7);
+
+    // Y Axis Labels (0, half, max)
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
     const yTicks = [0, Math.round(maxCumulative / 2), Math.round(maxCumulative)];
@@ -459,7 +500,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
     ctx.fillStyle = '#94a3b8';
     ctx.font = '500 10px Inter, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('Shift time (IST)', padding.left + chartW / 2, padding.top + chartH + 26);
+    ctx.fillText('Shift time', padding.left + chartW / 2, padding.top + chartH + 26);
 
     // 5. Draw Brush Selection overlay if active
     if (isSelecting && selectionBox) {
@@ -486,7 +527,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
     selectionBox,
   ]);
 
-  // Fast Binary Search to find nearest produce marker for hover
+  // Binary search hover lookup
   const findNearestProduce = useCallback(
     (targetMs: number): ProcessedProduce | null => {
       if (sortedProduces.length === 0) return null;
@@ -505,7 +546,6 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
         }
       }
 
-      // Check neighbors
       let nearest: ProcessedProduce | null = null;
       let minDiff = Infinity;
 
@@ -522,7 +562,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
     [sortedProduces]
   );
 
-  // Mouse Interaction: Hover Tooltip & Brush Selection
+  // Mouse move handler
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -533,14 +573,12 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
     const chartW = dimensions.width - padding.left - padding.right;
     const chartH = dimensions.height - padding.top - padding.bottom;
 
-    // Brush selection drag update
     if (isSelecting && selectionBox) {
       setSelectionBox((prev) => (prev ? { ...prev, currentX: mouseX } : null));
       setTooltipData(null);
       return;
     }
 
-    // Inside chart boundary check
     if (
       mouseX < padding.left ||
       mouseX > padding.left + chartW ||
@@ -554,12 +592,11 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
     const span = zoomRange.endMs - zoomRange.startMs;
     const targetMs = zoomRange.startMs + ((mouseX - padding.left) / chartW) * span;
 
-    // 1. Check produce marker hit
     if (showIndividualProduces) {
       const nearest = findNearestProduce(targetMs);
       if (nearest) {
         const nearestX = padding.left + ((nearest.epochMs - zoomRange.startMs) / span) * chartW;
-        if (Math.abs(nearestX - mouseX) <= 10) {
+        if (Math.abs(nearestX - mouseX) <= 12) {
           setTooltipData({
             x: mouseX,
             y: mouseY,
@@ -576,7 +613,6 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
       }
     }
 
-    // 2. Check segment band hit
     for (const seg of processedSegments) {
       if (targetMs >= seg.startMs && targetMs <= seg.endMs) {
         const durationMins = Math.round((seg.endMs - seg.startMs) / (60 * 1000));
@@ -616,13 +652,11 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
       const x1 = Math.min(selectionBox.startX, selectionBox.currentX);
       const x2 = Math.max(selectionBox.startX, selectionBox.currentX);
 
-      // Only zoom if dragged at least 15 pixels
       if (x2 - x1 > 15) {
         const span = zoomRange.endMs - zoomRange.startMs;
         const newStartMs = zoomRange.startMs + ((x1 - padding.left) / chartW) * span;
         const newEndMs = zoomRange.startMs + ((x2 - padding.left) / chartW) * span;
 
-        // Ensure at least 60 seconds span
         if (newEndMs - newStartMs >= 60 * 1000) {
           setZoomRange({
             startMs: Math.max(defaultRange.startMs, newStartMs),
@@ -637,7 +671,6 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
   };
 
   const handleDoubleClick = () => {
-    // Reset zoom back to full shift window
     setZoomRange(defaultRange);
   };
 

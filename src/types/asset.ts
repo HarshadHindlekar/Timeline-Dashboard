@@ -14,4 +14,11 @@ export interface FlattenedAsset {
   assetlevel_id: number;
   levelName?: string;
   path: string;
+  parentId?: string | null;
 }
+
+export interface AssetLevelOption {
+  id: number | 'all';
+  label: string;
+}
+

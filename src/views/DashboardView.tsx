@@ -5,7 +5,10 @@ import {
   Alert,
   Button,
   Skeleton,
+  Fab,
+  Tooltip,
 } from '@mui/material';
+import { SmartToy as BotIcon } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import { AppHeader } from '../components/common/AppHeader';
 import { FilterBar } from '../components/filters/FilterBar';
@@ -20,11 +23,16 @@ import { buildShiftWindowUtc, formatShiftRangeBadge } from '../utils/timezone';
 import { buildHourlyColumns, aggregateHourlyData } from '../utils/segmentSlicer';
 
 export const DashboardView: React.FC = () => {
-
   // Filter States
+  const [selectedLevel, setSelectedLevel] = useState<number | 'all'>('all');
   const [selectedAsset, setSelectedAsset] = useState<FlattenedAsset | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string>('2026-06-23');
+  const [selectedMachine, setSelectedMachine] = useState<FlattenedAsset | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string>('2026-06-25');
   const [selectedShift, setSelectedShift] = useState<ParsedShiftInterval | null>(null);
+
+  // Auto Refresh States
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState<boolean>(false);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(30);
 
   // Chart Toggle States
   const [showIndividualProduces, setShowIndividualProduces] = useState<boolean>(false);
@@ -43,14 +51,13 @@ export const DashboardView: React.FC = () => {
 
   const flattenedAssets = useMemo(() => flattenAssetTree(assetTree), [assetTree]);
 
-  // Set default asset (prefer a machine or line, e.g. Line 1 or first item)
+  // Set default asset (prefer Line 1 or first line)
   useEffect(() => {
     if (!selectedAsset && flattenedAssets.length > 0) {
-      // Look for a node with codename or level 20 / 10
-      const lineOrMachine =
-        flattenedAssets.find((a) => a.assetlevel_id === 20 || a.assetlevel_id === 10) ||
+      const lineNode =
+        flattenedAssets.find((a) => a.name.toLowerCase() === 'line 1' || a.assetlevel_id === 20) ||
         flattenedAssets[0];
-      setSelectedAsset(lineOrMachine);
+      setSelectedAsset(lineNode);
     }
   }, [flattenedAssets, selectedAsset]);
 
@@ -74,6 +81,9 @@ export const DashboardView: React.FC = () => {
     }
   }, [parsedShifts, selectedShift]);
 
+  // Active target asset for API: if machine is selected use machine, else use selected line/asset
+  const activeEntity = selectedMachine || selectedAsset;
+
   // 3. Compute Time Range in UTC and IST
   const shiftWindow = useMemo(() => {
     if (!selectedShift) return null;
@@ -83,8 +93,8 @@ export const DashboardView: React.FC = () => {
   // 4. Fetch Machine Intervals (Timeline & Segments)
   const intervalsQueryKey = [
     'machineIntervals',
-    selectedAsset?.id,
-    selectedAsset?.assetlevel_id,
+    activeEntity?.id,
+    activeEntity?.assetlevel_id,
     shiftWindow?.from_ts,
     shiftWindow?.to_ts,
     showIndividualProduces,
@@ -99,13 +109,13 @@ export const DashboardView: React.FC = () => {
   } = useQuery({
     queryKey: intervalsQueryKey,
     queryFn: () => {
-      if (!selectedAsset || !shiftWindow) return null;
+      if (!activeEntity || !shiftWindow) return null;
       return getMachineIntervals({
         entity_scope: {
           type: 'asset',
           asset: {
-            asset_id: selectedAsset.id,
-            asset_level_id: selectedAsset.assetlevel_id,
+            asset_id: activeEntity.id,
+            asset_level_id: activeEntity.assetlevel_id,
           },
         },
         time_range: {
@@ -117,7 +127,7 @@ export const DashboardView: React.FC = () => {
         group_produce_counts_by_part_model: true,
       });
     },
-    enabled: Boolean(selectedAsset && shiftWindow),
+    enabled: Boolean(activeEntity && shiftWindow),
     retry: 2,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
@@ -125,8 +135,8 @@ export const DashboardView: React.FC = () => {
   // 5. Fetch Cycle Time Metrics (for Table)
   const cycleTimesQueryKey = [
     'cycleTimes',
-    selectedAsset?.id,
-    selectedAsset?.assetlevel_id,
+    activeEntity?.id,
+    activeEntity?.assetlevel_id,
     shiftWindow?.from_ts,
     shiftWindow?.to_ts,
   ];
@@ -137,13 +147,13 @@ export const DashboardView: React.FC = () => {
   } = useQuery({
     queryKey: cycleTimesQueryKey,
     queryFn: () => {
-      if (!selectedAsset || !shiftWindow) return null;
+      if (!activeEntity || !shiftWindow) return null;
       return getCycleTimeMetrics({
         entity_scope: {
           type: 'asset',
           asset: {
-            asset_id: selectedAsset.id,
-            asset_level_id: selectedAsset.assetlevel_id,
+            asset_id: activeEntity.id,
+            asset_level_id: activeEntity.assetlevel_id,
           },
         },
         metrics: ['ideal_cycle_time_seconds', 'actual_cycle_time_seconds'],
@@ -154,7 +164,7 @@ export const DashboardView: React.FC = () => {
         distribution: 'hourly',
       });
     },
-    enabled: Boolean(selectedAsset && shiftWindow),
+    enabled: Boolean(activeEntity && shiftWindow),
     retry: 2,
   });
 
@@ -162,6 +172,17 @@ export const DashboardView: React.FC = () => {
   const handleRefresh = async () => {
     await Promise.all([refetchIntervals(), refetchCycleTimes()]);
   };
+
+  // Auto Refresh Polling Effect
+  useEffect(() => {
+    if (!autoRefreshEnabled) return;
+    const intervalMs = autoRefreshInterval * 1000;
+    const timer = setInterval(() => {
+      handleRefresh();
+    }, intervalMs);
+
+    return () => clearInterval(timer);
+  }, [autoRefreshEnabled, autoRefreshInterval, handleRefresh]);
 
   // 6. Build Hourly Columns & Aggregated Table Metrics
   const hourlyColumns = useMemo(() => {
@@ -193,24 +214,34 @@ export const DashboardView: React.FC = () => {
   const activeError = assetError || shiftError || intervalsError;
 
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: '#f8fafc' }}>
+    <Box sx={{ minHeight: '100vh', backgroundColor: '#f8fafc', position: 'relative' }}>
       <AppHeader />
 
       <Container maxWidth="xl" sx={{ py: 3, px: { xs: 2, md: 3 } }}>
-        {/* Filter Bar */}
+        {/* Filter Bar with Cascading Selectors */}
         <FilterBar
           assets={flattenedAssets}
-          assetTree={assetTree}
-          shifts={parsedShifts}
+          selectedLevel={selectedLevel}
           selectedAsset={selectedAsset}
+          selectedMachine={selectedMachine}
           selectedDate={selectedDate}
           selectedShift={selectedShift}
+          shifts={parsedShifts}
           shiftBadgeLabel={shiftBadgeLabel}
           partModelLabel={partModelLabel}
           isRefreshing={isFetchingIntervals}
-          onAssetChange={setSelectedAsset}
+          autoRefreshEnabled={autoRefreshEnabled}
+          autoRefreshInterval={autoRefreshInterval}
+          onLevelChange={setSelectedLevel}
+          onAssetChange={(asset) => {
+            setSelectedAsset(asset);
+            setSelectedMachine(null); // Reset machine selection when asset changes
+          }}
+          onMachineChange={setSelectedMachine}
           onDateChange={setSelectedDate}
           onShiftChange={setSelectedShift}
+          onToggleAutoRefresh={setAutoRefreshEnabled}
+          onAutoRefreshIntervalChange={setAutoRefreshInterval}
           onRefresh={handleRefresh}
         />
 
@@ -255,6 +286,23 @@ export const DashboardView: React.FC = () => {
           </>
         )}
       </Container>
+
+      {/* Floating Action Bot Icon (matching bottom right in Mockup 4) */}
+      <Box sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 100 }}>
+        <Tooltip title="MES Copilot Assistant">
+          <Fab
+            size="medium"
+            sx={{
+              backgroundColor: '#1e1b4b',
+              color: '#ffffff',
+              '&:hover': { backgroundColor: '#312e81' },
+              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.2)',
+            }}
+          >
+            <BotIcon />
+          </Fab>
+        </Tooltip>
+      </Box>
     </Box>
   );
 };

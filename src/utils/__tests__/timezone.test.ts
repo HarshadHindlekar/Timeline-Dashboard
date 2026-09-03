@@ -3,7 +3,6 @@ import {
   buildShiftWindowUtc,
   createIstDateTime,
   formatTimeIst,
-  IST_TIMEZONE,
 } from '../timezone';
 
 describe('Timezone & Shift Window Engine', () => {
