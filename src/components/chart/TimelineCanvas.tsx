@@ -206,7 +206,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
     const sortedBuckets = Array.from(bucketsMap.entries()).sort((a, b) => a[0] - b[0]);
 
     let runningTotal = 0;
-    const points: { epochMs: number; cumulative: number }[] = [];
+    const points: { epochMs: number; cumulative: number; isFlatExtension?: boolean }[] = [];
 
     // Point at shift start: 0
     points.push({ epochMs: defaultRange.startMs, cumulative: 0 });
@@ -218,8 +218,20 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
       points.push({ epochMs: endMs, cumulative: runningTotal });
     }
 
+    // Extend line horizontally flat across the gray screen to shift end (matching mockup!)
+    if (lastActiveTimestampMs && lastActiveTimestampMs < defaultRange.endMs && points.length > 0) {
+      const lastPt = points[points.length - 1];
+      if (lastPt.epochMs < defaultRange.endMs) {
+        points.push({
+          epochMs: defaultRange.endMs,
+          cumulative: lastPt.cumulative,
+          isFlatExtension: true,
+        });
+      }
+    }
+
     return points;
-  }, [intervals?.produce_counts, defaultRange.startMs, defaultRange.endMs]);
+  }, [intervals?.produce_counts, defaultRange.startMs, defaultRange.endMs, lastActiveTimestampMs]);
 
   // Y Scale matching mockup: 0, 250, 500
   const yAxisConfig = useMemo(() => {
@@ -296,9 +308,18 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
       return padding.top + chartH - (count / yAxisConfig.yMax) * chartH;
     };
 
-    // 1. Draw Chart Box Background & Subtle Outline (Matching Mockup)
+    // 1. Draw Chart Box Background (White active area + Light gray screen for future un-elapsed time)
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(padding.left, padding.top, chartW, chartH);
+
+    if (lastActiveTimestampMs && lastActiveTimestampMs < defaultRange.endMs) {
+      const nowX = timeToX(lastActiveTimestampMs);
+      const futureW = padding.left + chartW - nowX;
+      if (futureW > 0) {
+        ctx.fillStyle = '#f1f5f9'; // Light gray future screen matching mockup
+        ctx.fillRect(nowX, padding.top, futureW, chartH);
+      }
+    }
 
     // 2. Draw segment bands inside chart area clip
     ctx.save();
@@ -397,6 +418,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
 
         // Draw points with circular nodes and rounded blue badges (SS 2)
         for (const pt of cumulativePoints) {
+          if (pt.isFlatExtension) continue; // Skip extension endpoint so only real points get nodes & badges
           const x = timeToX(pt.epochMs);
           const y = countToY(pt.cumulative);
 
