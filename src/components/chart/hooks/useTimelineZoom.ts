@@ -1,14 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, RefObject } from 'react';
-
-interface ZoomRange {
-  startMs: number;
-  endMs: number;
-}
-
-interface SelectionBox {
-  startX: number;
-  currentX: number;
-}
+import { ZoomRange, SelectionBox } from '../../../types/chart';
 
 export const useTimelineZoom = (
   defaultRange: ZoomRange,

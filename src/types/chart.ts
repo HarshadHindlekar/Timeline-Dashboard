@@ -17,6 +17,36 @@ export interface ProcessedSegment {
   color: string;
 }
 
+export interface CumulativePoint {
+  epochMs: number;
+  cumulative: number;
+  isFlatExtension?: boolean;
+}
+
+export interface YAxisConfig {
+  yMax: number;
+  ticks: number[];
+}
+
+export interface ZoomRange {
+  startMs: number;
+  endMs: number;
+}
+
+export interface SelectionBox {
+  startX: number;
+  currentX: number;
+}
+
+export interface ChartDimensions {
+  width: number;
+  height: number;
+  padding: { top: number; right: number; bottom: number; left: number };
+  chartW: number;
+  chartH: number;
+  axisGap: number;
+}
+
 export interface TimelineCanvasProps {
   intervals: MachineIntervalsData | null | undefined;
   windowStartUtc: string;
@@ -34,6 +64,15 @@ export interface TimelineSectionProps {
   isFetching?: boolean;
   onToggleIndividualProduces: (val: boolean) => void;
   onTogglePointLabels: (val: boolean) => void;
+}
+
+export interface TimelineZoomControlsProps {
+  showIndividualProduces: boolean;
+  isZoomed: boolean;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onResetZoom: () => void;
+  onZoomPreset: (hours: number) => void;
 }
 
 export interface HoverTooltipData {

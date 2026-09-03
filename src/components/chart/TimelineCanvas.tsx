@@ -1,12 +1,16 @@
 import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import dayjs from 'dayjs';
-import { TimelineCanvasProps, ProcessedProduce, HoverTooltipData } from '../../types/chart';
+import {
+  TimelineCanvasProps,
+  ProcessedProduce,
+  HoverTooltipData,
+  ChartDimensions,
+} from '../../types/chart';
 import { TimelineTooltip } from './TimelineTooltip';
 import { TimelineZoomControls } from './TimelineZoomControls';
 import { useTimelineData } from './hooks/useTimelineData';
 import { useTimelineZoom } from './hooks/useTimelineZoom';
 import {
-  ChartDimensions,
   drawBackground,
   drawSegments,
   drawGridAndAxes,

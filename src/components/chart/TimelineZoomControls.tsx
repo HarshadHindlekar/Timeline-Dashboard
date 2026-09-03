@@ -5,15 +5,7 @@ import {
   ZoomOut as ZoomOutIcon,
   RestartAlt as ResetIcon,
 } from '@mui/icons-material';
-
-interface TimelineZoomControlsProps {
-  showIndividualProduces: boolean;
-  isZoomed: boolean;
-  onZoomIn: () => void;
-  onZoomOut: () => void;
-  onResetZoom: () => void;
-  onZoomPreset: (hours: number) => void;
-}
+import { TimelineZoomControlsProps } from '../../types/chart';
 
 export const TimelineZoomControls: React.FC<TimelineZoomControlsProps> = ({
   showIndividualProduces,

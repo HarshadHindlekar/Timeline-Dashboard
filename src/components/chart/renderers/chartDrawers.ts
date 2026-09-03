@@ -1,16 +1,12 @@
 import dayjs from 'dayjs';
-import { ProcessedProduce, ProcessedSegment } from '../../../types/chart';
-import { CumulativePoint, YAxisConfig } from '../hooks/useTimelineData';
+import {
+  ProcessedProduce,
+  ProcessedSegment,
+  CumulativePoint,
+  YAxisConfig,
+  ChartDimensions,
+} from '../../../types/chart';
 import { formatTimeIst } from '../../../utils/timezone';
-
-export interface ChartDimensions {
-  width: number;
-  height: number;
-  padding: { top: number; right: number; bottom: number; left: number };
-  chartW: number;
-  chartH: number;
-  axisGap: number;
-}
 
 export const drawBackground = (
   ctx: CanvasRenderingContext2D,

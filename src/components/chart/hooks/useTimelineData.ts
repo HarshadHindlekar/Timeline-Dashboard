@@ -1,20 +1,14 @@
 import { useMemo } from 'react';
 import dayjs from 'dayjs';
 import { MachineIntervalsData } from '../../../types/analytics';
-import { ProcessedProduce, ProcessedSegment } from '../../../types/chart';
+import {
+  ProcessedProduce,
+  ProcessedSegment,
+  CumulativePoint,
+  YAxisConfig,
+} from '../../../types/chart';
 import { SEGMENT_COLORS } from '../TimelineLegend';
 import { categorizeSegment } from '../../../utils/segmentSlicer';
-
-export interface CumulativePoint {
-  epochMs: number;
-  cumulative: number;
-  isFlatExtension?: boolean;
-}
-
-export interface YAxisConfig {
-  yMax: number;
-  ticks: number[];
-}
 
 export const useTimelineData = (
   intervals: MachineIntervalsData | null | undefined,
