@@ -66,15 +66,6 @@ export interface TimelineSectionProps {
   onTogglePointLabels: (val: boolean) => void;
 }
 
-export interface TimelineZoomControlsProps {
-  showIndividualProduces: boolean;
-  isZoomed: boolean;
-  onZoomIn: () => void;
-  onZoomOut: () => void;
-  onResetZoom: () => void;
-  onZoomPreset: (hours: number) => void;
-}
-
 export interface HoverTooltipData {
   x: number;
   y: number;

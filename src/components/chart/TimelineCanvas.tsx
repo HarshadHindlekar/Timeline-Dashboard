@@ -7,7 +7,6 @@ import {
   ChartDimensions,
 } from '../../types/chart';
 import { TimelineTooltip } from './TimelineTooltip';
-import { TimelineZoomControls } from './TimelineZoomControls';
 import { useTimelineData } from './hooks/useTimelineData';
 import { useTimelineZoom } from './hooks/useTimelineZoom';
 import {
@@ -60,11 +59,7 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
     isZoomed,
     isSelecting,
     selectionBox,
-    handleZoomIn,
-    handleZoomOut,
     handleResetZoom,
-    handleZoomPreset,
-    handleWheel,
     handleMouseDown,
     handleSelectionMove,
     handleMouseUp,
@@ -292,15 +287,6 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
         userSelect: 'none',
       }}
     >
-      <TimelineZoomControls
-        showIndividualProduces={showIndividualProduces}
-        isZoomed={isZoomed}
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
-        onResetZoom={handleResetZoom}
-        onZoomPreset={handleZoomPreset}
-      />
-
       <canvas
         ref={canvasRef}
         style={{
@@ -317,7 +303,6 @@ export const TimelineCanvas: React.FC<TimelineCanvasProps> = ({
           setTooltipData(null);
         }}
         onDoubleClick={handleResetZoom}
-        onWheel={handleWheel}
       />
 
       <TimelineTooltip data={tooltipData} containerWidth={dimensions.width} />
