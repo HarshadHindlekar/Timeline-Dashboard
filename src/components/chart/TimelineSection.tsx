@@ -6,6 +6,8 @@ import {
   Box,
   FormControlLabel,
   Switch,
+  LinearProgress,
+  Fade,
 } from '@mui/material';
 import { WarningAmber as WarningIcon } from '@mui/icons-material';
 import { MachineIntervalsData } from '../../types/analytics';
@@ -19,6 +21,7 @@ interface TimelineSectionProps {
   windowEndUtc: string;
   showIndividualProduces: boolean;
   showPointLabels: boolean;
+  isFetching?: boolean;
   onToggleIndividualProduces: (val: boolean) => void;
   onTogglePointLabels: (val: boolean) => void;
 }
@@ -29,6 +32,7 @@ export const TimelineSection: React.FC<TimelineSectionProps> = ({
   windowEndUtc,
   showIndividualProduces,
   showPointLabels,
+  isFetching,
   onToggleIndividualProduces,
   onTogglePointLabels,
 }) => {
@@ -80,16 +84,32 @@ export const TimelineSection: React.FC<TimelineSectionProps> = ({
   }, [intervals]);
 
   return (
-    <Card
-      elevation={0}
-      sx={{
-        borderRadius: 2,
-        border: '1px solid #e2e8f0',
-        backgroundColor: '#ffffff',
-        mb: 3,
-      }}
-    >
-      <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+    <Fade in timeout={350}>
+      <Card
+        elevation={0}
+        sx={{
+          borderRadius: 2,
+          border: '1px solid #e2e8f0',
+          backgroundColor: '#ffffff',
+          mb: 3,
+          position: 'relative',
+          overflow: 'hidden',
+          transition: 'opacity 250ms ease-in-out',
+        }}
+      >
+        {isFetching && (
+          <LinearProgress
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 3,
+              zIndex: 10,
+            }}
+          />
+        )}
+        <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
         {/* Row 1: Title on left, Color Chips on right (Mockup 3 & 4) */}
         <Box
           sx={{
@@ -319,6 +339,7 @@ export const TimelineSection: React.FC<TimelineSectionProps> = ({
           )}
         </Box>
       </CardContent>
-    </Card>
+      </Card>
+    </Fade>
   );
 };

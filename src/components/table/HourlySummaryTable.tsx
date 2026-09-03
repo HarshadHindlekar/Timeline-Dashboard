@@ -9,6 +9,8 @@ import {
   TableBody,
   TableRow,
   TableCell,
+  Fade,
+  LinearProgress,
 } from '@mui/material';
 import { HourlySummaryColumn } from '../../types/analytics';
 import { HourMetrics } from '../../utils/segmentSlicer';
@@ -16,6 +18,7 @@ import { HourMetrics } from '../../utils/segmentSlicer';
 interface HourlySummaryTableProps {
   columns: HourlySummaryColumn[];
   metrics: HourMetrics[];
+  isFetching?: boolean;
 }
 
 interface RowConfig {
@@ -25,7 +28,7 @@ interface RowConfig {
   bold?: boolean;
 }
 
-export const HourlySummaryTable: React.FC<HourlySummaryTableProps> = ({ columns, metrics }) => {
+export const HourlySummaryTable: React.FC<HourlySummaryTableProps> = ({ columns, metrics, isFetching }) => {
   const rowConfigs: RowConfig[] = [
     {
       key: 'total',
@@ -91,16 +94,32 @@ export const HourlySummaryTable: React.FC<HourlySummaryTableProps> = ({ columns,
   ];
 
   return (
-    <Card
-      elevation={0}
-      sx={{
-        borderRadius: 2,
-        border: '1px solid #e2e8f0',
-        backgroundColor: '#ffffff',
-        mb: 4,
-      }}
-    >
-      <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+    <Fade in timeout={400}>
+      <Card
+        elevation={0}
+        sx={{
+          borderRadius: 2,
+          border: '1px solid #e2e8f0',
+          backgroundColor: '#ffffff',
+          mb: 4,
+          position: 'relative',
+          overflow: 'hidden',
+          transition: 'opacity 250ms ease-in-out',
+        }}
+      >
+        {isFetching && (
+          <LinearProgress
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 3,
+              zIndex: 10,
+            }}
+          />
+        )}
+        <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: '#0f172a', fontSize: '1rem', mb: 2 }}>
           Hourly Production & Downtime Summary
         </Typography>
@@ -196,6 +215,7 @@ export const HourlySummaryTable: React.FC<HourlySummaryTableProps> = ({ columns,
           </Table>
         </TableContainer>
       </CardContent>
-    </Card>
+      </Card>
+    </Fade>
   );
 };

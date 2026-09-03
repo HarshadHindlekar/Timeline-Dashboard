@@ -4,9 +4,9 @@ import {
   Container,
   Alert,
   Button,
-  Skeleton,
   Fab,
   Tooltip,
+  Fade,
 } from '@mui/material';
 import { SmartToy as BotIcon } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
@@ -14,6 +14,7 @@ import { AppHeader } from '../components/common/AppHeader';
 import { FilterBar } from '../components/filters/FilterBar';
 import { TimelineSection } from '../components/chart/TimelineSection';
 import { HourlySummaryTable } from '../components/table/HourlySummaryTable';
+import { DashboardSkeleton } from '../components/common/DashboardSkeleton';
 import { getAssetTree, flattenAssetTree } from '../api/assets';
 import { getShifts, parseShiftIntervals } from '../api/shifts';
 import { getMachineIntervals, getCycleTimeMetrics } from '../api/analytics';
@@ -209,8 +210,7 @@ export const DashboardView: React.FC = () => {
     return undefined;
   }, [intervalsData?.produce_counts]);
 
-  const isInitialLoading =
-    isLoadingAssets || isLoadingShifts || (isLoadingIntervals && !intervalsData);
+  const isInitialLoading = !intervalsData && (isLoadingAssets || isLoadingShifts || isLoadingIntervals);
   const activeError = assetError || shiftError || intervalsError;
 
   return (
@@ -260,30 +260,34 @@ export const DashboardView: React.FC = () => {
           </Alert>
         )}
 
-        {/* Loading State Skeleton */}
+        {/* Loading State Skeleton or Smooth Loaded Content */}
         {isInitialLoading ? (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <Skeleton variant="rounded" height={340} sx={{ borderRadius: 2 }} />
-            <Skeleton variant="rounded" height={400} sx={{ borderRadius: 2 }} />
-          </Box>
+          <DashboardSkeleton />
         ) : (
-          <>
-            {/* Timeline Section */}
-            {shiftWindow && (
-              <TimelineSection
-                intervals={intervalsData}
-                windowStartUtc={shiftWindow.from_ts}
-                windowEndUtc={shiftWindow.to_ts}
-                showIndividualProduces={showIndividualProduces}
-                showPointLabels={showPointLabels}
-                onToggleIndividualProduces={setShowIndividualProduces}
-                onTogglePointLabels={setShowPointLabels}
-              />
-            )}
+          <Fade in timeout={350}>
+            <Box>
+              {/* Timeline Section */}
+              {shiftWindow && (
+                <TimelineSection
+                  intervals={intervalsData}
+                  windowStartUtc={shiftWindow.from_ts}
+                  windowEndUtc={shiftWindow.to_ts}
+                  showIndividualProduces={showIndividualProduces}
+                  showPointLabels={showPointLabels}
+                  isFetching={isFetchingIntervals}
+                  onToggleIndividualProduces={setShowIndividualProduces}
+                  onTogglePointLabels={setShowPointLabels}
+                />
+              )}
 
-            {/* Hourly Summary Table */}
-            <HourlySummaryTable columns={hourlyColumns} metrics={hourlyMetrics} />
-          </>
+              {/* Hourly Summary Table */}
+              <HourlySummaryTable
+                columns={hourlyColumns}
+                metrics={hourlyMetrics}
+                isFetching={isFetchingIntervals}
+              />
+            </Box>
+          </Fade>
         )}
       </Container>
 
